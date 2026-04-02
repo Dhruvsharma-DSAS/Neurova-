@@ -1,16 +1,33 @@
-# React + Vite
+# Neurova AI Platform 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A professional, high-fidelity AI workspace for synthetic reasoning and visual manifestation.
 
-Currently, two official plugins are available:
+### 🌐 Live Deployment
+**Production**: [https://neurova-ten.vercel.app/](https://neurova-ten.vercel.app/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+### 🍱 Main Features
+- **Neural Text Studio**: Powered by Llama 3.2 for advanced logic and assistance.
+- **Visual Image Studio**: Powered by SDXL for crystalline image materialization.
+- **Minimalist UX**: Centered chat viewport with a professional dark-mode laboratory aesthetic.
+- **Secure Architecture**: Hardened environment variable orchestration for secure API management.
+- **Production Ready**: Optimized for Vercel/Netlify with built-in version tracking (v1.0.1) and SPA routing.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 📦 Installation
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Configure your `.env` file:
+   - `VITE_HF_API_KEY`
+   - `VITE_HF_TEXT_URL`
+   - `VITE_HF_IMAGE_URL`
+4. Run locally: `npm run dev`
 
-## Expanding the ESLint configuration
+### 🛠️ Technology Stack
+- **Framework**: React + Vite
+- **Styling**: Vanilla CSS / Glassmorphism
+- **Intelligence**: Hugging Face Inference Providers (Llama 3.2, Stable Diffusion XL)
+- **Infrastructure**: Vercel / Netlify
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+Developed as a next-gen synthetic laboratory.
