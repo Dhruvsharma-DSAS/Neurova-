@@ -36,18 +36,27 @@ const App = () => {
 
   const chatEndRef = useRef(null);
 
-  // 3. API Logic
+  // 3. API Key Logic
   const getApiKey = () => {
-    if (apiMode === 'user') return userApiKey;
+    // If user mode is active, use the custom key from state/localStorage
+    if (apiMode === 'user' && userApiKey.trim()) {
+      return userApiKey.trim();
+    }
+    // Otherwise fallback to the VITE environment variable
     return import.meta.env.VITE_HF_API_KEY;
   };
 
   const saveUserKey = () => {
+    if (!userApiKey.trim()) {
+      setError("Please enter a valid API key.");
+      return;
+    }
     localStorage.setItem('user_api_key', userApiKey);
     localStorage.setItem('api_mode', 'user');
     setApiMode('user');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
+    setError(null);
   };
 
   useEffect(() => {
@@ -59,8 +68,10 @@ const App = () => {
     if (!inputVal.trim()) return;
     
     const activeKey = getApiKey();
+    
+    // VALIDATION: Check if a key actually exists
     if (!activeKey) {
-      setError("API Authorization required. Configure in the sidebar.");
+      setError("API key missing. Please configure API settings.");
       return;
     }
 
@@ -69,6 +80,8 @@ const App = () => {
     setInputVal('');
     setIsLoading(true);
     setError(null);
+
+    const history = messages.map(m => ({ role: m.role, content: m.content }));
 
     try {
       if (mode === 'text') {
@@ -79,22 +92,38 @@ const App = () => {
         });
         const response = await openai.chat.completions.create({
           model: "meta-llama/Llama-3.2-1B-Instruct:novita",
-          messages: [{ role: "system", content: "You are Neurova, a professional and intelligent AI assistant." }, ...messages.map(m => ({ role: m.role, content: m.content })), { role: "user", content: inputVal }],
+          messages: [
+            { role: "system", content: "You are Neurova, a professional and intelligent AI assistant." },
+            ...history,
+            { role: "user", content: inputVal }
+          ],
           max_tokens: 512,
         });
         setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', type: 'text', content: response.choices[0].message.content }]);
       } else {
         const response = await fetch(import.meta.env.VITE_HF_IMAGE_URL, {
-          headers: { Authorization: `Bearer ${activeKey}`, "Content-Type": "application/json" },
+          headers: { 
+            Authorization: `Bearer ${activeKey}`, 
+            "Content-Type": "application/json" 
+          },
           method: "POST",
-          body: JSON.stringify({ model: "stabilityai/stable-diffusion-xl-base-1.0", prompt: inputVal, response_format: "b64_json" }),
+          body: JSON.stringify({ 
+            model: "stabilityai/stable-diffusion-xl-base-1.0", 
+            prompt: inputVal, 
+            response_format: "b64_json" 
+          }),
         });
-        if (!response.ok) throw new Error("Image materialize failed. Verify API key.");
+        
+        if (!response.ok) throw new Error("Image materialization failed. Check your API key and connection.");
+        
         const result = await response.json();
-        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', type: 'image', content: `data:image/png;base64,${result.data[0].b64_json}` }]);
+        const base64 = result.data?.[0]?.b64_json;
+        if (!base64) throw new Error("Invalid API response format.");
+        
+        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', type: 'image', content: `data:image/png;base64,${base64}` }]);
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +131,7 @@ const App = () => {
 
   return (
     <div className="app-wrapper">
-      {/* --- Sidebar Section --- */}
+      {/* Sidebar Section */}
       <aside className="sidebar">
         <header className="sidebar-brand">
           <Zap size={24} color="var(--accent-primary)" fill="var(--accent-primary)" />
@@ -126,38 +155,51 @@ const App = () => {
           </button>
         </section>
 
-        {/* --- API Settings Section --- */}
+        {/* API Settings Section */}
         <section className="api-card">
-          <p className="nav-label" style={{ marginBottom: '1rem', color: '#fff' }}>API Settings</p>
+          <p className="nav-label" style={{ marginBottom: '1rem', color: '#fff' }}>API Configuration</p>
           <div className="api-toggle">
-            <button className={`toggle-opt ${apiMode === 'default' ? 'active' : ''}`} onClick={() => { setApiMode('default'); localStorage.setItem('api_mode', 'default'); }}>
+            <button 
+              className={`toggle-opt ${apiMode === 'default' ? 'active' : ''}`} 
+              onClick={() => { setApiMode('default'); localStorage.setItem('api_mode', 'default'); setError(null); }}
+            >
               Default
             </button>
-            <button className={`toggle-opt ${apiMode === 'user' ? 'active' : ''}`} onClick={() => { setApiMode('user'); localStorage.setItem('api_mode', 'user'); }}>
+            <button 
+              className={`toggle-opt ${apiMode === 'user' ? 'active' : ''}`} 
+              onClick={() => { setApiMode('user'); localStorage.setItem('api_mode', 'user'); setError(null); }}
+            >
               My Key
             </button>
           </div>
 
           <AnimatePresence>
             {apiMode === 'user' ? (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }} 
+                animate={{ opacity: 1, height: 'auto' }} 
+                exit={{ opacity: 0, height: 0 }} 
+                style={{ overflow: 'hidden' }}
+              >
                 <input 
                   type="password" 
-                  placeholder="hf_..." 
+                  placeholder="Enter Hugging Face API key" 
                   className="api-input"
                   value={userApiKey} 
                   onChange={(e) => setUserApiKey(e.target.value)}
                 />
-                <button className="api-save-btn" onClick={saveUserKey}>Save & Use</button>
+                <button className="api-save-btn" onClick={saveUserKey}>Save Key</button>
               </motion.div>
-            ) : (
-              <span className="api-status">Using Standard AI Key</span>
-            )}
+            ) : null}
           </AnimatePresence>
+          
+          <span className="api-status">
+            {apiMode === 'default' ? "Using Default API" : "Using Custom API"}
+          </span>
         </section>
       </aside>
 
-      {/* --- Chat Interface Section --- */}
+      {/* Main Chat Area */}
       <main className="chat-main">
         <div className="chat-container">
           <div className="chat-content-limit">
@@ -165,7 +207,7 @@ const App = () => {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', opacity: 0.6 }}>
                 <Bot size={64} strokeWidth={1} style={{ marginBottom: '1.5rem' }} />
                 <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem' }}>Neurova AI</h1>
-                <p style={{ maxWidth: 400 }}>A minimal and balanced synthetic laboratory for text reasoning and visual manifestation.</p>
+                <p style={{ maxWidth: 400 }}>Experience next-gen synthetic reasoning and visual manifestation.</p>
               </div>
             ) : (
               messages.map((m) => (
@@ -180,10 +222,10 @@ const App = () => {
                         <div>{m.content}</div>
                       ) : (
                         <div className="msg-img">
-                          <img src={m.content} alt="Materialized Vision" />
+                          <img src={m.content} alt="AI Generated" />
                           <div style={{ padding: '0.5rem', background: '#000', textAlign: 'right' }}>
                             <button className="nav-button" style={{ width: 'auto', display: 'inline-flex', padding: '4px 10px' }} onClick={() => {
-                              const a = document.createElement('a'); a.href = m.content; a.download = `art-${Date.now()}.png`; a.click();
+                              const a = document.createElement('a'); a.href = m.content; a.download = `neurova-art-${Date.now()}.png`; a.click();
                             }}>
                               <Download size={14} /> Download
                             </button>
@@ -215,7 +257,7 @@ const App = () => {
           </div>
         </div>
 
-        {/* --- Floating Input Dock --- */}
+        {/* Input Terminal */}
         <section className="input-section">
           <div className="input-wrapper">
             <input 
@@ -231,13 +273,13 @@ const App = () => {
               {isLoading ? <Loader2 size={18} style={{ animation: 'spin 1.5s linear infinite' }} /> : <ArrowUp size={20} />}
             </button>
           </div>
-          <p style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.8rem' }}>
-            NEUROVA INTENDED FOR PROFESSIONAL SYNERGY
+          <p style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.8rem', letterSpacing: '0.1em' }}>
+            NEUROVA CORE // PRODUCTION READY
           </p>
         </section>
       </main>
 
-      {/* --- Toast Feedback --- */}
+      {/* Toast Feedback */}
       <AnimatePresence>
         {showToast && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="toast-box">
