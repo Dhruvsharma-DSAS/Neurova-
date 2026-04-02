@@ -17,61 +17,49 @@ import {
   Cloud,
   UserCheck,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  RotateCw,
+  ZapOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// --- ⚙️ DEPLOYMENT & VERSION CONFIG ---
+const APP_VERSION = "v1.0.1";
+const LAST_UPDATED = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 const App = () => {
   // 1. Data States
   const [messages, setMessages] = useState([]);
   const [inputVal, setInputVal] = useState('');
-  const [mode, setMode] = useState('text'); // text or image
+  const [mode, setMode] = useState('text'); 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // 2. Dual API States (Default vs User)
-  const [apiMode, setApiMode] = useState(localStorage.getItem('api_mode') || 'default');
-  const [userApiKey, setUserApiKey] = useState(localStorage.getItem('user_api_key') || '');
-  const [showToast, setShowToast] = useState(false);
-
   const chatEndRef = useRef(null);
-
-  // 3. API Key Logic
-  const getApiKey = () => {
-    // If user mode is active, use the custom key from state/localStorage
-    if (apiMode === 'user' && userApiKey.trim()) {
-      return userApiKey.trim();
-    }
-    // Otherwise fallback to the VITE environment variable
-    return import.meta.env.VITE_HF_API_KEY;
-  };
-
-  const saveUserKey = () => {
-    if (!userApiKey.trim()) {
-      setError("Please enter a valid API key.");
-      return;
-    }
-    localStorage.setItem('user_api_key', userApiKey);
-    localStorage.setItem('api_mode', 'user');
-    setApiMode('user');
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-    setError(null);
-  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // 2. Refresh Logic
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
+  // 3. API Key Fallback check
+  const getSafeApiKey = () => {
+    return import.meta.env.VITE_HF_API_KEY || "";
+  };
+
   // 4. API Handlers
   const handleSend = async () => {
     if (!inputVal.trim()) return;
     
-    const activeKey = getApiKey();
+    const activeKey = getSafeApiKey();
     
-    // VALIDATION: Check if a key actually exists
+    // ERROR HANDLING: If API key missing in production
     if (!activeKey) {
-      setError("API key missing. Please configure API settings.");
+      setError("App not configured. Please set API key.");
       return;
     }
 
@@ -114,11 +102,11 @@ const App = () => {
           }),
         });
         
-        if (!response.ok) throw new Error("Image materialization failed. Check your API key and connection.");
+        if (!response.ok) throw new Error("Materialization failed. Verify your connection/API limit.");
         
         const result = await response.json();
         const base64 = result.data?.[0]?.b64_json;
-        if (!base64) throw new Error("Invalid API response format.");
+        if (!base64) throw new Error("Invalid response from intelligence provider.");
         
         setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', type: 'image', content: `data:image/png;base64,${base64}` }]);
       }
@@ -153,50 +141,22 @@ const App = () => {
           <button className="nav-button" onClick={() => setMessages([])}>
             <Eraser size={18} /> Clear Session
           </button>
+          <button className="nav-button" onClick={handleRefresh}>
+            <RotateCw size={18} /> Check for Updates
+          </button>
         </section>
 
-        {/* API Settings Section */}
-        <section className="api-card">
-          <p className="nav-label" style={{ marginBottom: '1rem', color: '#fff' }}>API Configuration</p>
-          <div className="api-toggle">
-            <button 
-              className={`toggle-opt ${apiMode === 'default' ? 'active' : ''}`} 
-              onClick={() => { setApiMode('default'); localStorage.setItem('api_mode', 'default'); setError(null); }}
-            >
-              Default
-            </button>
-            <button 
-              className={`toggle-opt ${apiMode === 'user' ? 'active' : ''}`} 
-              onClick={() => { setApiMode('user'); localStorage.setItem('api_mode', 'user'); setError(null); }}
-            >
-              My Key
-            </button>
+        {/* --- VERSION & STATUS FOOTER --- */}
+        <footer className="sidebar-footer">
+          <div className="status-badge" style={{ marginBottom: '0.75rem' }}>
+             <CheckCircle2 size={12} color="#22c55e" />
+             <span>Core Online // {APP_VERSION}</span>
           </div>
-
-          <AnimatePresence>
-            {apiMode === 'user' ? (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }} 
-                animate={{ opacity: 1, height: 'auto' }} 
-                exit={{ opacity: 0, height: 0 }} 
-                style={{ overflow: 'hidden' }}
-              >
-                <input 
-                  type="password" 
-                  placeholder="Enter Hugging Face API key" 
-                  className="api-input"
-                  value={userApiKey} 
-                  onChange={(e) => setUserApiKey(e.target.value)}
-                />
-                <button className="api-save-btn" onClick={saveUserKey}>Save Key</button>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-          
-          <span className="api-status">
-            {apiMode === 'default' ? "Using Default API" : "Using Custom API"}
-          </span>
-        </section>
+          <div style={{ padding: '0 0.5rem', fontSize: '0.65rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+             Latest version deployed<br />
+             Updated: {LAST_UPDATED}
+          </div>
+        </footer>
       </aside>
 
       {/* Main Chat Area */}
@@ -222,10 +182,10 @@ const App = () => {
                         <div>{m.content}</div>
                       ) : (
                         <div className="msg-img">
-                          <img src={m.content} alt="AI Generated" />
+                          <img src={m.content} alt="Materialized Vision" />
                           <div style={{ padding: '0.5rem', background: '#000', textAlign: 'right' }}>
                             <button className="nav-button" style={{ width: 'auto', display: 'inline-flex', padding: '4px 10px' }} onClick={() => {
-                              const a = document.createElement('a'); a.href = m.content; a.download = `neurova-art-${Date.now()}.png`; a.click();
+                              const a = document.createElement('a'); a.href = m.content; a.download = `art-${Date.now()}.png`; a.click();
                             }}>
                               <Download size={14} /> Download
                             </button>
@@ -242,6 +202,14 @@ const App = () => {
               <div className="loading-box">
                 <Loader2 size={16} style={{ animation: 'spin 2s linear infinite' }} />
                 <span>{mode === 'text' ? "Neurova is reasoning..." : "Manifesting vision..."}</span>
+              </div>
+            )}
+
+            {!getSafeApiKey() && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.05)', color: '#ef4444', padding: '1.5rem', borderRadius: 16, border: '1px solid rgba(239, 68, 68, 0.2)', textAlign: 'center' }}>
+                <ZapOff size={32} style={{ marginBottom: '1rem', opacity: 0.5 }} />
+                <h3 style={{ fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.25rem' }}>Core Integration Offline</h3>
+                <p style={{ fontSize: '0.8rem', opacity: 0.8 }}>App not configured. Please set API key in environment.</p>
               </div>
             )}
 
@@ -267,24 +235,24 @@ const App = () => {
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSend()}
-              disabled={isLoading}
+              disabled={isLoading || !getSafeApiKey()}
             />
-            <button className="send-button" onClick={handleSend} disabled={isLoading || !inputVal.trim()}>
+            <button className="send-button" onClick={handleSend} disabled={isLoading || !inputVal.trim() || !getSafeApiKey()}>
               {isLoading ? <Loader2 size={18} style={{ animation: 'spin 1.5s linear infinite' }} /> : <ArrowUp size={20} />}
             </button>
           </div>
           <p style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.8rem', letterSpacing: '0.1em' }}>
-            NEUROVA CORE // PRODUCTION READY
+            NEUROVA INTENDED FOR PROFESSIONAL SYNERGY
           </p>
         </section>
       </main>
 
-      {/* Toast Feedback */}
+      {/* --- Toast Feedback --- */}
       <AnimatePresence>
         {showToast && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="toast-box">
             <CheckCircle2 size={16} color="var(--accent-primary)" />
-            <span>API credentials updated</span>
+            <span>Operational status verified</span>
           </motion.div>
         )}
       </AnimatePresence>
